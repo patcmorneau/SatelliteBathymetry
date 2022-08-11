@@ -1,4 +1,4 @@
-import sys, os, subprocess, threading
+import sys, os, subprocess, threading, time
 from queue import Queue
 sys.path.insert(0,"../src/python")
 from sentinel2_imgs_downloader import Sentinel2Downloader
@@ -7,7 +7,7 @@ from sentinel2_imgs_downloader import Sentinel2Downloader
 class Download_product(threading.Thread):
 	def run(self):
 
-		global mutex, empty, full, sentinelDirDeck, products
+		global mutex, empty, full, sentinelDirQueue, products
 		
 		index = 0
 		
@@ -20,7 +20,7 @@ class Download_product(threading.Thread):
 			os.mkdir(productPath)
 			#print("path : ", productPath)
 			print("downloading product : ", productPath)
-			"""
+			
 			sentinel2.download(product, productPath)
 			zipFile = os.path.join(productPath, product)
 			print("unzip file : ", zipFile)
@@ -31,32 +31,35 @@ class Download_product(threading.Thread):
 			newDirName = os.path.join(productPath, product)
 			p = subprocess.Popen('mv {}/* {}'.format(productPath, newDirName) , shell='True')
 			p.wait()
-			"""
+			
 			newDirName = productPath
-			sentinelDirDeck.put(newDirName)
+			sentinelDirQueue.put(newDirName)
 			print("Producer produced : ", newDirName)
-			index+=1
+			
+			
 			mutex.release()
 			full.release()
-
+			#time.sleep(3)
+			index+=1
+			
  
 # Consumer Thread Class
 class georeferenceThread(threading.Thread):
 	def run(self):
 
-		global mutex, empty, full, sentinelDirDeck, nbProduct
+		global mutex, empty, full, sentinelDirQueue, nbProduct
 		items_consumed = 0
 
-		while items_consumed < nbProduct:
+		while items_consumed < nbProduct-1:
 			full.acquire()
 			mutex.acquire()
 
-			item = sentinelDirDeck.get()
+			item = sentinelDirQueue.get()
 			print("georeferencing : ", item)
 
 			mutex.release()
 			empty.release()
-
+			time.sleep(1)
 			items_consumed += 1
 
 
@@ -101,8 +104,8 @@ nbProduct = len(products)
 print("{} sentinel2 zip file to download".format(nbProduct))
 
 # Shared Memory variables
-sentinelDirDeck =  Queue()
-pointFileDeck = Queue()
+sentinelDirQueue =  Queue()
+pointFileQueue = Queue()
 
 # Declaring Semaphores
 mutex = threading.Semaphore()
